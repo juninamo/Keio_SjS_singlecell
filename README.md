@@ -1,7 +1,7 @@
 # Multi-modal single-cell analysis of salivary glands from Sjögren's syndrome
 Multi-omics analysis (scRNA-seq, TCR/BCR repertoire, and spatial transcriptome) of SjS, Consortium for Drug Discovery for Immuno-Inflammatory Diseases
 
-[![DOI](https://zenodo.org/badge/518259643.svg)](https://zenodo.org/badge/latestdoi/518259643)
+[![DOI](https://zenodo.org/badge/XXX.svg)](https://zenodo.org/badge/latestdoi/XXX)
 ![](https://komarev.com/ghpvc/?username=juninamo&style=flat-square&color=green&label=REPOSITORY+VIEWS)
 
 ## Dissection of Sjögren's syndrome salivary glands with distinct autoantibody profiles reveals activated T cell subsets and fibroblast-mediated inflammation 
