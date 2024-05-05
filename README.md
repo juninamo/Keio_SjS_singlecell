@@ -30,7 +30,7 @@ The data presented here comes from the [Division of Rheumatology, Department of 
 This study was supported by XX. 
 
 <kbd>
-<img src="https://github.com/juninamo/consortium_step2_SjS/blob/main/images/Keio_logo.png" width="800" align="center">
+<img src="https://github.com/juninamo/consortium_step2_SjS/blob/main/images/Keio_logo.png" width="300" align="center">
 </kbd>
 
 &nbsp;&nbsp;
