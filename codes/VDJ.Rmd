@@ -1,0 +1,194 @@
+---
+title: SjS MSG [VDJ]
+author: 
+  name: Jun Inamo
+  email: juninamo@keio.jp
+  affiliation: Division of Rheumatology, Department of Internal Medicine, Keio University School of Medicine, Tokyo, Japan
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+---
+
+```{r, echo=FALSE, results="hide", message=FALSE}
+knitr::opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
+# BiocManager::install("BiocStyle")
+library(BiocStyle)
+```
+
+```{r}
+source("utils.R")
+```
+
+
+
+# TCR
+
+## Loading Contig Data
+
+```{r}
+
+data_type = "TCR"
+
+contig_list <- list()
+
+# Loop to load CSV files
+for (sample_id in sample_ids) {
+  tryCatch({
+    S <- read.csv(paste0("/path/to/",sample_id,"/vdj_t/filtered_contig_annotations.csv"))
+    contig_list[[sample_id]] <- S
+  }, error = function(e) {
+    print(paste("Error reading CSV for sample_id =", sample_id))
+  })
+}
+
+```
+
+
+```{r}
+combined <- combineTCR(contig_list, 
+                        samples = sample_ids, 
+                        ID = sample_ids)
+```
+
+
+## Adding Additional Variables
+
+```{r}
+
+for(feature in colnames(meta)){
+  combined <- addVariable(combined, 
+                          name = feature, 
+                          variables = meta[,feature])
+}
+
+combined_t = combined
+```
+
+***
+
+
+# BCR
+
+## Loading Contig Data
+
+```{r}
+data_type = "BCR"
+
+contig_list <- list()
+
+# Loop to load CSV files
+for (sample_id in sample_ids) {
+  tryCatch({
+    S <- read.csv(paste0("/path/to/",sample_id,"/vdj_b/filtered_contig_annotations.csv"))
+    contig_list[[sample_id]] <- S
+  }, error = function(e) {
+    print(paste("Error reading CSV for sample_id =", sample_id))
+  })
+}
+
+
+```
+
+
+```{r}
+combined <- combineBCR(contig_list, 
+                        samples = sample_ids, 
+                        ID = sample_ids)
+```
+
+## Adding Additional Variables
+```{r}
+
+for(feature in colnames(meta)){
+  combined <- addVariable(combined, 
+                          name = feature, 
+                          variables = meta[,feature])
+}
+
+combined_b = combined
+```
+
+
+
+***
+
+# Interacting analysis with Repertoire and mRNA Expression
+
+
+```{r}
+
+gex <- suppressMessages(readRDS(file = paste0("/path/to/SeuratObj_merged_GEX.rds")))
+
+gex_t <- suppressMessages(readRDS(file = paste0("/path/to/SeuratObj_T_merged_GEX.rds")))
+
+gex_b <- suppressMessages(readRDS(file = paste0("/path/to/SeuratObj_B_merged_GEX.rds")))
+
+```
+
+## Combining both TCR and BCR 
+
+If you have performed TCR/BCR enrichment or want to add info for both gamma-delta and alpha-beta T cells, now we can just make a single list and use ```combineExpression()```. **Major note** if there are duplicate barcodes (if a cell has both Ig and TCR), the immune receptor information will not be added. As an anecdote, the [testing data](https://support.10xgenomics.com/single-cell-vdj/datasets/6.0.1/SC5v2_Melanoma_5Kcells_Connect_single_channel_SC5v2_Melanoma_5Kcells_Connect_single_channel) we used to improve this function had 5-6% of barcode overlap.
+
+
+```{r}
+
+list.receptors <- c(combined_t, combined_b)
+
+```
+
+```{r}
+
+list.receptors = lapply(list.receptors, function(df) {
+  df$barcode <- paste(df$sample, df$barcode, sep = "_")
+  return(df)
+})
+```
+
+
+
+```{r}
+
+seurat <- combineExpression(list.receptors, 
+                            gex, 
+                            cloneCall = "strict", 
+                            chain = "both",
+                            group.by = "sample", 
+                            proportion = FALSE, 
+                            cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
+
+```
+
+
+```{r, fig.width=5.5, fig.height=4}
+seurat_t <- combineExpression(combined_t, 
+                            gex_t, 
+                            cloneCall = "strict", 
+                            chain = "both",
+                            group.by = "sample", 
+                            proportion = FALSE, 
+                            cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
+
+```
+
+### B/plasma cell clusters
+
+```{r, fig.width=5.5, fig.height=4}
+seurat_b <- combineExpression(combined_b, 
+                            gex_b, 
+                            cloneCall = "strict", 
+                            chain = "both",
+                            group.by = "sample", 
+                            proportion = FALSE, 
+                            cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
+
+```
+
+***
+
+
+
+# sessionInfo
+```{r}
+sessionInfo()
+```

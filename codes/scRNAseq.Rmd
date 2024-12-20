@@ -1,0 +1,249 @@
+---
+title: SjS MSG [scRNA-seq]
+author: 
+  name: Jun Inamo
+  email: juninamo@keio.jp
+  affiliation: Division of Rheumatology, Department of Internal Medicine, Keio University School of Medicine, Tokyo, Japan
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+---
+
+
+
+```{r, echo=FALSE, results="hide", message=FALSE}
+knitr::opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
+# BiocManager::install("BiocStyle")
+library(BiocStyle)
+```
+
+```{r}
+source("utils.R")
+```
+
+
+```{r}
+
+data_type = "GEX"
+
+successful_gex_list <- list()
+successful_gex_list_mat <- list()
+
+for (sample_id in sample_ids) {
+  tryCatch({
+    gex.data <- Read_CellBender_h5_Mat(paste0("/path/to/",sample_id,"/cellbender_feature_bc_matrix_filtered.h5"))
+    successful_gex_list_mat[[sample_id]] <- gex.data
+    gex <- CreateSeuratObject(counts = gex.data, 
+                              project = paste0(data_type,"_",sample_id), min.cells = 3, min.features = 200)
+    
+    successful_gex_list[[sample_id]] <- gex
+  }, error = function(e) {
+    print(paste("Error at sample_id =", sample_id))
+  })
+}
+print("Success sample_ids; ")
+print(names(successful_gex_list))
+
+cell_bender_merged <- Merge_Sparse_Data_All(matrix_list = successful_gex_list_mat, 
+            add_cell_ids = names(successful_gex_list_mat))
+
+gex <- Merge_Seurat_List(successful_gex_list, 
+                         add.cell.ids = names(successful_gex_list),
+                         merge.data = TRUE)
+
+```
+
+
+
+```{r}
+
+# The [[ operator can add columns to object metadata. This is a great place to stash QC stats
+gex[["percent.mt"]] <- PercentageFeatureSet(gex, pattern = "^MT-")
+
+```
+
+
+```{r}
+
+gex <- subset(gex, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
+rb.genes <- rownames(gex)[grep("^RP[SL]",rownames(gex))]
+percent.ribo <- colSums(gex[rb.genes,])/Matrix::colSums(gex)*100
+gex <- AddMetaData(gex, percent.ribo, col.name = "percent.ribo")
+
+```
+
+
+## Load metadata
+
+```{r}
+
+metaInfo = dplyr::left_join(gex@meta.data,
+                            meta %>%
+                              dplyr::mutate(orig.ident = paste0(data_type,"_",sample)),
+                            by="orig.ident")
+
+gex@meta.data$Age = metaInfo$Age
+gex@meta.data$Sex = metaInfo$Sex
+gex@meta.data$Disease = metaInfo$Disease
+
+```
+
+
+
+## Normalizing the data
+
+```{r}
+gex <- NormalizeData(gex, normalization.method = "LogNormalize")
+gex <- NormalizeData(gex)
+```
+
+## Identification of highly variable features (feature selection)
+
+```{r}
+gex <- FindVariableFeatures(gex, selection.method = "vst", nfeatures = 2000)
+
+```
+
+## Scaling the data
+```{r}
+gex <- ScaleData(gex)
+```
+
+## Perform PCA
+
+```{r}
+set.seed(1234)
+gex <- RunPCA(gex, features = VariableFeatures(object = gex))
+```
+
+## batch correction
+
+```{r}
+set.seed(1234)
+gex <- gex %>% 
+  RunHarmony(c("batch"), plot_convergence = TRUE)
+```
+
+
+
+## Cluster cells
+
+
+```{r}
+# use best number of hPCs and min.dist for UMAP
+dim=20
+min.dist=0.3
+resolution=0.1
+gex <- FindNeighbors(gex, reduction = "harmony", 
+                     dims = 1:dim,
+                     k.param = 30,
+                     verbose = FALSE
+)
+gex <- RunUMAP(gex, reduction = "harmony", 
+               dims = 1:dim,
+               n.neighbors = 30L,
+               min.dist = min.dist,
+               verbose = FALSE)
+gex <- FindClusters(gex, reduction = "harmony", 
+                    dims = 1:dim, 
+                    resolution = resolution,
+                    verbose = FALSE)
+```
+
+
+## filter our cells in clusters with < 30 cells
+
+```{r}
+min_cell_cluster = 30
+
+gex = subset(gex, 
+             idents = names(table(Idents(gex)))[table(Idents(gex))>min_cell_cluster])
+
+```
+
+
+## Association test by cluster-free and cluster-based approach
+
+### MiloR
+
+```{r}
+
+milo <- Milo(as.SingleCellExperiment(gex))
+milo <- buildGraph(milo, 
+                   reduced.dim = "HARMONY",
+                   k = 30, d = 30)
+milo <- makeNhoods(milo, prop = 0.1, k = 30, d=30, 
+                   refined = TRUE, reduced_dims = "HARMONY")
+milo <- countCells(milo, meta.data = data.frame(colData(milo)), samples="orig.ident")
+
+milo_design <- data.frame(colData(milo))[,c("orig.ident", "Disease",
+                                            "Age","Sex",
+                                            "batch")]
+milo_design <- distinct(milo_design)
+rownames(milo_design) <- milo_design$orig.ident
+milo_design <- milo_design[colnames(nhoodCounts(milo)), , drop=FALSE]
+
+contrast.1 <- paste0("Disease",disease_label, " - DiseasenonSS") 
+da_results <- testNhoods(milo,
+                         design = ~ 0 + Age + Sex + batch + Disease, 
+                         design.df = milo_design, 
+                         model.contrasts = contrast.1, 
+                         fdr.weighting="graph-overlap")
+
+da_results <- annotateNhoods(milo, da_results, coldata_col = "seurat_clusters")
+
+```
+
+
+### CNA
+
+```{r}
+disease_group = "All"
+disease_label = "AllSS"
+control_group = c("nonSS")
+
+logi = (gex$Disease %in% c(control_group,
+                           disease_group
+))
+gex_sub <- subset(x = gex, 
+                  Disease %in% control_group | 
+                    Disease %in% disease_group
+)
+
+gex_sub = FindNeighbors(gex_sub, reduction = "harmony", 
+                        dims = 1:dim,
+                        k.param = 30,
+                        verbose = FALSE
+)
+
+gex_sub@meta.data$Disease <- as.character(gex_sub@meta.data$Disease)
+gex_sub@meta.data$condition <- ifelse(gex_sub@meta.data$Disease %in% control_group, "nonSS", "SS")
+gex_sub@meta.data$condition_val <- as.numeric(factor(gex_sub@meta.data$condition, c('nonSS', 'SS')))
+print(table(gex_sub@meta.data$condition))
+print(table(gex_sub@meta.data$Sex))
+
+covs = c("Age","Sex")
+
+gex_sub <- association.Seurat(
+  seurat_object = gex_sub, 
+  test_var = 'condition_val', 
+  samplem_key = 'orig.ident', 
+  graph_use = 'RNA_snn', 
+  verbose = TRUE,
+  batches = NULL,
+  covs = covs
+)
+
+
+```
+
+<br/><br/>
+
+***
+
+# sessionInfo
+
+```{r}
+sessionInfo()
+```
