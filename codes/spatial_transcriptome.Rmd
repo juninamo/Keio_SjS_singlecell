@@ -1,0 +1,574 @@
+---
+title: SjS MSG [Spatial Transcriptomics]
+author: 
+  name: Jun Inamo
+  email: juninamo@keio.jp
+  affiliation: Division of Rheumatology, Department of Internal Medicine, Keio University School of Medicine, Tokyo, Japan
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+---
+
+
+
+
+```{r, echo=FALSE, results="hide", message=FALSE}
+knitr::opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
+# BiocManager::install("BiocStyle")
+library(BiocStyle)
+```
+
+```{r}
+source("utils.R")
+```
+
+
+# QC
+
+
+```{r}
+
+for (sample_id in 1:5) {
+  tryCatch({
+    ste = Load10X_Spatial(data.dir = paste0("../Visium/SpaceRanger/",sample_id,"_"))
+
+  plot1 <- VlnPlot(ste, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
+  plot2 <- SpatialFeaturePlot(ste, features = "nCount_Spatial") + 
+    labs(title = paste0("slide ",sample_id)) +
+    theme(legend.position = "right")
+  plot(wrap_plots(plot1, plot2))
+  
+  ste <- subset(ste, subset = nCount_Spatial > 0)
+  
+  # store mitochondrial percentage in object meta data
+  ste <- PercentageFeatureSet(ste, pattern = "^MT-", col.name = "percent.mt")
+
+  # run sctransform
+  ste <- SCTransform(ste, 
+                     assay = "Spatial", 
+                     vars.to.regress = "percent.mt", 
+                     verbose = FALSE)
+
+  assign(paste0("ste_", sample_id), ste)
+  
+  }, error = function(e) {
+    print(paste("Error at sample_id =", sample_id))
+  })
+}
+
+
+
+```
+
+# Split by samples based on location information
+
+## Slide 1
+
+```{r}
+
+ste_1
+
+SpatialDimPlot(ste_1,
+               cells.highlight = WhichCells(ste_1, 
+                                            expression = slice1_imagerow > 300 & slice1_imagecol < 300))
+cell_barcodes_lb = WhichCells(ste_1, 
+                           expression = slice1_imagerow > 300 & slice1_imagecol < 300)
+ste_sub <- subset(ste_1, cells = cell_barcodes_lb)
+SpatialDimPlot(ste_sub)
+
+
+SpatialDimPlot(ste_1,
+               cells.highlight = WhichCells(ste_1, 
+                                            expression = slice1_imagerow < 300 & slice1_imagecol < 300))
+cell_barcodes_lt = WhichCells(ste_1, 
+                              expression = slice1_imagerow < 300 & slice1_imagecol < 300)
+ste_sub <- subset(ste_1, cells = cell_barcodes_lt)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_1,
+               cells.highlight = WhichCells(ste_1, 
+                                            expression = slice1_imagerow > 200 & slice1_imagecol > 300))
+cell_barcodes_rb = WhichCells(ste_1, 
+                              expression = slice1_imagerow > 200 & slice1_imagecol > 300)
+ste_sub <- subset(ste_1, cells = cell_barcodes_rb)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_1,
+               cells.highlight = WhichCells(ste_1, 
+                                            expression = slice1_imagerow < 200 & slice1_imagecol > 300))
+cell_barcodes_rt = WhichCells(ste_1, 
+                              expression = slice1_imagerow < 200 & slice1_imagecol > 300)
+ste_sub <- subset(ste_1, cells = cell_barcodes_rt)
+SpatialDimPlot(ste_sub)
+
+ste_1[["sample_id"]] <- NA
+
+# Update sample ID based on barcodes
+ste_1[["sample_id"]][cell_barcodes_lb,] <- "LB107"
+ste_1[["sample_id"]][cell_barcodes_lt,] <- "LB133"
+ste_1[["sample_id"]][cell_barcodes_rb,] <- "LB179"
+ste_1[["sample_id"]][cell_barcodes_rt,] <- "LB142"
+
+table(ste_1[["sample_id"]])
+is.na(ste_1[["sample_id"]]) %>% sum()
+```
+
+## Slide 2
+
+```{r}
+
+ste_2
+
+
+SpatialDimPlot(ste_2,
+               cells.highlight = WhichCells(ste_2, 
+                                            expression = slice1_imagerow > 300 & slice1_imagecol < 350))
+cell_barcodes_lb = WhichCells(ste_2, 
+                              expression = slice1_imagerow > 300 & slice1_imagecol < 350)
+ste_sub <- subset(ste_2, cells = cell_barcodes_lb)
+SpatialDimPlot(ste_sub)
+
+
+SpatialDimPlot(ste_2,
+               cells.highlight = WhichCells(ste_2, 
+                                            expression = slice1_imagerow < 300 & slice1_imagecol < 350))
+cell_barcodes_lt = WhichCells(ste_2, 
+                              expression = slice1_imagerow < 300 & slice1_imagecol < 350)
+ste_sub <- subset(ste_2, cells = cell_barcodes_lt)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_2,
+               cells.highlight = WhichCells(ste_2, 
+                                            expression = slice1_imagerow > 300 & slice1_imagecol > 350))
+cell_barcodes_rb = WhichCells(ste_2, 
+                              expression = slice1_imagerow > 300 & slice1_imagecol > 350)
+ste_sub <- subset(ste_2, cells = cell_barcodes_rb)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_2,
+               cells.highlight = WhichCells(ste_2, 
+                                            expression = slice1_imagerow < 300 & slice1_imagecol > 350))
+cell_barcodes_rt = WhichCells(ste_2, 
+                              expression = slice1_imagerow < 300 & slice1_imagecol > 350)
+ste_sub <- subset(ste_2, cells = cell_barcodes_rt)
+SpatialDimPlot(ste_sub)
+
+ste_2[["sample_id"]] <- NA
+
+# Update sample ID based on barcodes
+ste_2[["sample_id"]][cell_barcodes_lb,] <- "LB128"
+ste_2[["sample_id"]][cell_barcodes_lt,] <- "LB135"
+ste_2[["sample_id"]][cell_barcodes_rb,] <- "LB012"
+ste_2[["sample_id"]][cell_barcodes_rt,] <- "LB178"
+
+table(ste_2[["sample_id"]])
+is.na(ste_2[["sample_id"]]) %>% sum()
+```
+
+## Slide 3
+
+```{r}
+ste_3
+
+SpatialDimPlot(ste_3,
+               cells.highlight = WhichCells(ste_3, 
+                                            expression = slice1_imagerow > 300 & slice1_imagecol < 350))
+cell_barcodes_lb = WhichCells(ste_3, 
+                              expression = slice1_imagerow > 300 & slice1_imagecol < 350)
+ste_sub <- subset(ste_3, cells = cell_barcodes_lb)
+SpatialDimPlot(ste_sub)
+
+
+SpatialDimPlot(ste_3,
+               cells.highlight = WhichCells(ste_3, 
+                                            expression = slice1_imagerow < 300 & slice1_imagecol < 350))
+cell_barcodes_lt = WhichCells(ste_3, 
+                              expression = slice1_imagerow < 300 & slice1_imagecol < 350)
+ste_sub <- subset(ste_3, cells = cell_barcodes_lt)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_3,
+               cells.highlight = WhichCells(ste_3, 
+                                            expression = slice1_imagerow > 300 & slice1_imagecol > 350))
+cell_barcodes_rb = WhichCells(ste_3, 
+                              expression = slice1_imagerow > 300 & slice1_imagecol > 350)
+ste_sub <- subset(ste_3, cells = cell_barcodes_rb)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_3,
+               cells.highlight = WhichCells(ste_3, 
+                                            expression = slice1_imagerow < 300 & slice1_imagecol > 350))
+cell_barcodes_rt = WhichCells(ste_3, 
+                              expression = slice1_imagerow < 300 & slice1_imagecol > 350)
+ste_sub <- subset(ste_3, cells = cell_barcodes_rt)
+SpatialDimPlot(ste_sub)
+
+ste_3[["sample_id"]] <- NA
+
+# Update sample ID based on barcodes
+ste_3[["sample_id"]][cell_barcodes_lb,] <- "LB176"
+ste_3[["sample_id"]][cell_barcodes_lt,] <- "LB134"
+ste_3[["sample_id"]][cell_barcodes_rb,] <- "LB177"
+ste_3[["sample_id"]][cell_barcodes_rt,] <- "LB032"
+
+table(ste_3[["sample_id"]])
+is.na(ste_3[["sample_id"]]) %>% sum()
+```
+
+## Slide 4
+
+```{r}
+ste_4
+
+SpatialDimPlot(ste_4,
+               cells.highlight = WhichCells(ste_4, 
+                                            expression = slice1_imagerow > 300 & slice1_imagecol < 300))
+cell_barcodes_lb = WhichCells(ste_4, 
+                              expression = slice1_imagerow > 300 & slice1_imagecol < 300)
+ste_sub <- subset(ste_4, cells = cell_barcodes_lb)
+SpatialDimPlot(ste_sub)
+
+
+SpatialDimPlot(ste_4,
+               cells.highlight = WhichCells(ste_4, 
+                                            expression = slice1_imagerow < 300 & slice1_imagecol < 300))
+cell_barcodes_lt = WhichCells(ste_4, 
+                              expression = slice1_imagerow < 300 & slice1_imagecol < 300)
+ste_sub <- subset(ste_4, cells = cell_barcodes_lt)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_4,
+               cells.highlight = WhichCells(ste_4, 
+                                            expression = slice1_imagerow > 200 & slice1_imagecol > 300))
+cell_barcodes_rb = WhichCells(ste_4, 
+                              expression = slice1_imagerow > 200 & slice1_imagecol > 300)
+ste_sub <- subset(ste_4, cells = cell_barcodes_rb)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_4,
+               cells.highlight = WhichCells(ste_4, 
+                                            expression = slice1_imagerow < 200 & slice1_imagecol > 300))
+cell_barcodes_rt = WhichCells(ste_4, 
+                              expression = slice1_imagerow < 200 & slice1_imagecol > 300)
+ste_sub <- subset(ste_4, cells = cell_barcodes_rt)
+SpatialDimPlot(ste_sub)
+
+ste_4[["sample_id"]] <- NA
+
+# Update sample ID based on barcodes
+ste_4[["sample_id"]][cell_barcodes_lb,] <- "LB150"
+ste_4[["sample_id"]][cell_barcodes_lt,] <- "LB090"
+ste_4[["sample_id"]][cell_barcodes_rb,] <- "LB118"
+ste_4[["sample_id"]][cell_barcodes_rt,] <- "LB138"
+
+table(ste_4[["sample_id"]])
+is.na(ste_4[["sample_id"]]) %>% sum()
+
+```
+
+## Slide 5
+
+```{r}
+ste_5
+
+SpatialDimPlot(ste_5,
+               cells.highlight = WhichCells(ste_5, 
+                                            expression = slice1_imagerow > 250 & slice1_imagecol < 300))
+cell_barcodes_lb = WhichCells(ste_5, 
+                              expression = slice1_imagerow > 250 & slice1_imagecol < 300)
+ste_sub <- subset(ste_5, cells = cell_barcodes_lb)
+SpatialDimPlot(ste_sub)
+
+
+SpatialDimPlot(ste_5,
+               cells.highlight = WhichCells(ste_5, 
+                                            expression = slice1_imagerow < 250 & slice1_imagecol < 300))
+cell_barcodes_lt = WhichCells(ste_5, 
+                              expression = slice1_imagerow < 250 & slice1_imagecol < 300)
+ste_sub <- subset(ste_5, cells = cell_barcodes_lt)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_5,
+               cells.highlight = WhichCells(ste_5, 
+                                            expression = slice1_imagerow > 250 & slice1_imagecol > 300))
+cell_barcodes_rb = WhichCells(ste_5, 
+                              expression = slice1_imagerow > 250 & slice1_imagecol > 300)
+ste_sub <- subset(ste_5, cells = cell_barcodes_rb)
+SpatialDimPlot(ste_sub)
+
+SpatialDimPlot(ste_5,
+               cells.highlight = WhichCells(ste_5, 
+                                            expression = slice1_imagerow < 250 & slice1_imagecol > 300))
+cell_barcodes_rt = WhichCells(ste_5, 
+                              expression = slice1_imagerow < 250 & slice1_imagecol > 300)
+ste_sub <- subset(ste_5, cells = cell_barcodes_rt)
+SpatialDimPlot(ste_sub)
+
+ste_5[["sample_id"]] <- NA
+
+# Update sample ID based on barcodes
+ste_5[["sample_id"]][cell_barcodes_lb,] <- "LB198"
+ste_5[["sample_id"]][cell_barcodes_lt,] <- "LB166"
+ste_5[["sample_id"]][cell_barcodes_rb,] <- "LB073"
+ste_5[["sample_id"]][cell_barcodes_rt,] <- "LB127"
+
+table(ste_5[["sample_id"]])
+is.na(ste_5[["sample_id"]]) %>% sum()
+```
+
+## Merge
+
+```{r}
+
+ste <- merge(ste_1, y = list(ste_2, ste_3, ste_4, ste_5), 
+             add.cell.ids = c("slide1", "slide2", "slide3", "slide4", "slide5"))
+names(ste@images) = c("slide1", "slide2", "slide3", "slide4", "slide5")
+ste@meta.data$slide = stringr::str_split(names(Idents(ste)), pattern = "_", simplify=TRUE)[,1]
+
+```
+
+
+# Filtering
+
+```{r}
+
+ste[["percent.mt"]] <- PercentageFeatureSet(ste, pattern = "^MT-")
+ste <- subset(ste, subset = nFeature_SCT >= 200 & percent.mt < 5)
+
+```
+
+
+
+# Normalization
+
+
+```{r}
+ste <- SCTransform(ste, 
+                     assay = "Spatial", 
+                     vars.to.regress = "percent.mt", 
+                     verbose = FALSE)
+
+
+```
+
+# Extract variable genes and PCA
+
+```{r}
+
+VariableFeatures(ste[["SCT"]]) <- SelectIntegrationFeatures(list(ste_1,ste_2,ste_3,ste_4,ste_5), nfeatures = 2000, verbose = TRUE)
+
+set.seed(1234)
+ste <- RunPCA(ste, assay = "SCT", verbose = FALSE)
+
+```
+
+
+# batch correction (Harmony)
+
+```{r}
+set.seed(1234)
+ste <- ste %>% 
+  RunHarmony(c("slide","sample_id"), 
+             assay.use = "SCT",
+             plot_convergence = TRUE)
+```
+
+
+# UMAP
+
+```{r}
+ste <- FindNeighbors(ste, 
+                     reduction = "harmony", 
+                     k.param = 30,
+                     dims = 1:30)
+
+ste <- RunUMAP(ste, 
+               reduction = "harmony", 
+               n.neighbors = 30L,
+               min.dist = 0.3,
+               dims = 1:30)
+
+ste = Seurat::FindClusters(ste, 
+                   resolution = 1.0,
+                   verbose = FALSE)
+```
+
+
+
+# Merge meta data
+
+```{r}
+metaInfo = dplyr::left_join(ste@meta.data,
+                            read.csv("../Visium/metadata_visium.csv"),
+                            by="sample_id")
+
+ste@meta.data$Disease = metaInfo$Disease
+```
+
+
+# Association test by cluster-free and cluster-based approach using Harmonyzed PCs
+
+## miloR
+
+```{r,}
+
+disease_group = "All"
+disease_label = "AllSS"
+control_group = c("nonSS")
+
+milo <- Milo(as.SingleCellExperiment(ste, assay = "SCT" ))
+set.seed(1234)
+milo <- buildGraph(milo, 
+                   reduced.dim = "HARMONY",
+                   k = 30, d = 30)
+set.seed(1234)
+milo <- makeNhoods(milo, prop = 0.1, k = 30, d=30, 
+                   refined = TRUE, reduced_dims = "HARMONY")
+milo <- countCells(milo, meta.data = data.frame(colData(milo)), samples="sample_id")
+
+milo_design <- data.frame(colData(milo))[,c("sample_id", "Disease",
+                                            "slide")]
+milo_design <- distinct(milo_design)
+rownames(milo_design) <- milo_design$sample_id
+milo_design <- milo_design[colnames(nhoodCounts(milo)), , drop=FALSE]
+
+contrast.1 <- paste0("Disease",disease_label, " - DiseasenonSS")
+
+da_results <- testNhoods(milo,
+                         design = ~ 0 + slide + Disease, 
+                         design.df = milo_design, 
+                         model.contrasts = contrast.1, 
+                         fdr.weighting="graph-overlap")
+
+da_results <- annotateNhoods(milo, da_results, coldata_col = "seurat_clusters")
+```
+
+
+## CNA
+
+```{r, fig.width=6.5, fig.height=5.5, fig.cap="CNA by nonSS vs. All SS", message=FALSE, warning=FALSE}
+
+logi = (ste$Disease %in% c(control_group,
+                           disease_group
+))
+ste_sub <- subset(x = ste, 
+                  Disease %in% control_group | 
+                    Disease %in% disease_group
+)
+
+ste_sub = FindNeighbors(ste_sub, reduction = "harmony", 
+                        dims = 1:30,
+                        k.param = 30,
+                        verbose = FALSE
+)
+
+ste_sub@meta.data$Disease <- as.character(ste_sub@meta.data$Disease)
+ste_sub@meta.data$condition <- ifelse(ste_sub@meta.data$Disease %in% control_group, "nonSS", "SS")
+ste_sub@meta.data$condition_val <- as.numeric(factor(ste_sub@meta.data$condition, c('nonSS', 'SS')))
+
+
+covs = c("Age", "Sex")
+
+ste_sub <- association_nam(
+  seurat_object = ste_sub, 
+  test_var = 'condition_val', 
+  samplem_key = 'sample_id', 
+  graph_use = 'SCT_snn', 
+  verbose = TRUE,
+  batches = "slide",
+  covs = covs
+)
+```
+
+
+# MANIFEST (MOFA2)
+ 
+[MEFISTO](https://biofam.github.io/MOFA2/MEFISTO.html)([Nat Methods 2022](https://www.nature.com/articles/s41592-021-01343-9))
+
+## Run MOFA2
+
+```{r}
+
+expression_data <- as.matrix(ste@assays$SCT$data)
+
+long_expression_data <- expression_data %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("feature") %>%
+  tidyr::pivot_longer(
+    cols = -feature,
+    names_to = "sample",
+    values_to = "value"
+  )
+
+locs <- rbind(ste@images$slide1@coordinates,
+              ste@images$slide2@coordinates %>%
+                dplyr::mutate(imagerow = imagerow + 20000,
+                              imagecol = imagecol + 20000),
+              ste@images$slide3@coordinates %>%
+                dplyr::mutate(imagerow = imagerow + 40000,
+                              imagecol = imagecol + 40000),
+              ste@images$slide4@coordinates %>%
+                dplyr::mutate(imagerow = imagerow + 60000,
+                              imagecol = imagecol + 60000),
+              ste@images$slide5@coordinates %>%
+                dplyr::mutate(imagerow = imagerow + 80000,
+                              imagecol = imagecol + 80000)
+) %>%
+  .[,c("imagerow","imagecol")] %>%
+  tibble::rownames_to_column("sample")
+
+all(locs$sample==colnames(expression_data))
+
+long_expression_data = dplyr::left_join(long_expression_data, 
+                                        ste@meta.data %>%
+                                          tibble::rownames_to_column("sample") %>%
+                                          .[,c("sample",
+                                               "Disease",
+                                               "slide",
+                                               "sample_id")], 
+                                        by = "sample") %>%
+  dplyr::mutate(Disease = gsub(" ","_",gsub("\\/","_",gsub("\\)","_",gsub("\\(","_",Disease)))),
+                group = slide
+  ) %>%
+  dplyr::select(feature, sample, value, group) %>%
+  dplyr::left_join(locs, by = "sample")
+
+MOFAobject_untrained <- create_mofa_from_df(long_expression_data)
+
+covariates = locs %>%
+  tidyr::pivot_longer(-sample, 
+                      names_to = "covariate",
+                      values_to = "value") 
+MOFAobject_untrained <- set_covariates(MOFAobject_untrained, covariates = covariates)
+
+data_opts <- get_default_data_options(MOFAobject_untrained)
+
+model_opts <- get_default_model_options(MOFAobject_untrained)
+model_opts$num_factors <- 4
+
+train_opts <- get_default_training_options(MOFAobject_untrained)
+train_opts$seed <- 2020
+
+mefisto_opts <- get_default_mefisto_options(MOFAobject_untrained)
+
+MOFAobject_untrained <- prepare_mofa(
+  object = MOFAobject_untrained,
+  data_options = data_opts,
+  model_options = model_opts,
+  training_options = train_opts,
+  mefisto_options = mefisto_opts
+) 
+
+gg_input <- plot_data_overview(MOFAobject_untrained,
+                               show_covariate = TRUE,
+                               show_dimensions = TRUE) 
+outfile = paste0("/path/to/Visium_ST_model_merged_gpu_GroupSlide_factor",model_opts$num_factors,".hdf5")
+MOFAobject <- run_mofa(MOFAobject_untrained, use_basilisk = TRUE, outfile = outfile)
+
+```
+
+
+
+***
+
