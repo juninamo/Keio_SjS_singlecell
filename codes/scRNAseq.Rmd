@@ -22,6 +22,7 @@ library(BiocStyle)
 source("utils.R")
 ```
 
+# Load data
 
 ```{r}
 
@@ -45,9 +46,6 @@ for (sample_id in sample_ids) {
 print("Success sample_ids; ")
 print(names(successful_gex_list))
 
-cell_bender_merged <- Merge_Sparse_Data_All(matrix_list = successful_gex_list_mat, 
-            add_cell_ids = names(successful_gex_list_mat))
-
 gex <- Merge_Seurat_List(successful_gex_list, 
                          add.cell.ids = names(successful_gex_list),
                          merge.data = TRUE)
@@ -55,26 +53,22 @@ gex <- Merge_Seurat_List(successful_gex_list,
 ```
 
 
-
 ```{r}
 
-# The [[ operator can add columns to object metadata. This is a great place to stash QC stats
 gex[["percent.mt"]] <- PercentageFeatureSet(gex, pattern = "^MT-")
+gex <- subset(gex, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
 
 ```
 
 
 ```{r}
 
-gex <- subset(gex, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
 rb.genes <- rownames(gex)[grep("^RP[SL]",rownames(gex))]
 percent.ribo <- colSums(gex[rb.genes,])/Matrix::colSums(gex)*100
 gex <- AddMetaData(gex, percent.ribo, col.name = "percent.ribo")
 
 ```
 
-
-## Load metadata
 
 ```{r}
 
@@ -89,35 +83,22 @@ gex@meta.data$Disease = metaInfo$Disease
 
 ```
 
-
-
-## Normalizing the data
+# Normalize and scale
 
 ```{r}
-gex <- NormalizeData(gex, normalization.method = "LogNormalize")
 gex <- NormalizeData(gex)
-```
-
-## Identification of highly variable features (feature selection)
-
-```{r}
 gex <- FindVariableFeatures(gex, selection.method = "vst", nfeatures = 2000)
-
-```
-
-## Scaling the data
-```{r}
 gex <- ScaleData(gex)
 ```
 
-## Perform PCA
+# Perform PCA
 
 ```{r}
 set.seed(1234)
 gex <- RunPCA(gex, features = VariableFeatures(object = gex))
 ```
 
-## batch correction
+# Batch correction
 
 ```{r}
 set.seed(1234)
@@ -125,16 +106,13 @@ gex <- gex %>%
   RunHarmony(c("batch"), plot_convergence = TRUE)
 ```
 
-
-
-## Cluster cells
-
+# Clustering
 
 ```{r}
-# use best number of hPCs and min.dist for UMAP
 dim=20
 min.dist=0.3
 resolution=0.1
+
 gex <- FindNeighbors(gex, reduction = "harmony", 
                      dims = 1:dim,
                      k.param = 30,
@@ -151,7 +129,6 @@ gex <- FindClusters(gex, reduction = "harmony",
                     verbose = FALSE)
 ```
 
-
 ## filter our cells in clusters with < 30 cells
 
 ```{r}
@@ -163,14 +140,13 @@ gex = subset(gex,
 ```
 
 
-## Association test by cluster-free and cluster-based approach
+# Association test
 
-### MiloR
+## MiloR
 
 ```{r}
 disease_group = "All"
-disease_label = "AllSS"
-control_group = c("nonSS")
+control_group = "nonSS"
 
 milo <- Milo(as.SingleCellExperiment(gex))
 milo <- buildGraph(milo, 
@@ -187,7 +163,7 @@ milo_design <- distinct(milo_design)
 rownames(milo_design) <- milo_design$orig.ident
 milo_design <- milo_design[colnames(nhoodCounts(milo)), , drop=FALSE]
 
-contrast.1 <- paste0("Disease",disease_label, " - DiseasenonSS") 
+contrast.1 <- paste0("DiseaseAllSS - DiseasenonSS") 
 da_results <- testNhoods(milo,
                          design = ~ 0 + Age + Sex + batch + Disease, 
                          design.df = milo_design, 
@@ -203,50 +179,25 @@ da_results <- annotateNhoods(milo, da_results, coldata_col = "seurat_clusters")
 
 ```{r}
 disease_group = "All"
-disease_label = "AllSS"
-control_group = c("nonSS")
+control_group = "nonSS"
 
-logi = (gex$Disease %in% c(control_group,
-                           disease_group
-))
-gex_sub <- subset(x = gex, 
-                  Disease %in% control_group | 
-                    Disease %in% disease_group
-)
-
-gex_sub = FindNeighbors(gex_sub, reduction = "harmony", 
-                        dims = 1:dim,
-                        k.param = 30,
-                        verbose = FALSE
-)
-
-gex_sub@meta.data$Disease <- as.character(gex_sub@meta.data$Disease)
-gex_sub@meta.data$condition <- ifelse(gex_sub@meta.data$Disease %in% control_group, "nonSS", "SS")
-gex_sub@meta.data$condition_val <- as.numeric(factor(gex_sub@meta.data$condition, c('nonSS', 'SS')))
-print(table(gex_sub@meta.data$condition))
-print(table(gex_sub@meta.data$Sex))
+gex@meta.data$Disease <- as.character(gex@meta.data$Disease)
+gex@meta.data$condition <- ifelse(gex@meta.data$Disease %in% control_group, "nonSS", "SS")
+gex@meta.data$condition_val <- as.numeric(factor(gex@meta.data$condition, c('nonSS', 'SS')))
 
 covs = c("Age","Sex")
 
-gex_sub <- association.Seurat(
-  seurat_object = gex_sub, 
+gex <- association.Seurat(
+  seurat_object = gex, 
   test_var = 'condition_val', 
   samplem_key = 'orig.ident', 
   graph_use = 'RNA_snn', 
   verbose = TRUE,
-  batches = NULL,
+  batches = "batch",
   covs = covs
 )
 
-
 ```
 
-<br/><br/>
 
 ***
-
-# sessionInfo
-
-```{r}
-sessionInfo()
-```

@@ -21,7 +21,6 @@ source("utils.R")
 ```
 
 
-
 # TCR
 
 ## Loading Contig Data
@@ -63,6 +62,7 @@ for(feature in colnames(meta)){
 }
 
 combined_t = combined
+
 ```
 
 ***
@@ -98,6 +98,7 @@ combined <- combineBCR(contig_list,
 ```
 
 ## Adding Additional Variables
+
 ```{r}
 
 for(feature in colnames(meta)){
@@ -107,14 +108,11 @@ for(feature in colnames(meta)){
 }
 
 combined_b = combined
+
 ```
 
 
-
-***
-
-# Interacting analysis with Repertoire and mRNA Expression
-
+# Integrating Repertoire and mRNA data
 
 ```{r}
 
@@ -126,25 +124,12 @@ gex_b <- suppressMessages(readRDS(file = paste0("/path/to/SeuratObj_B_merged_GEX
 
 ```
 
-## Combining both TCR and BCR 
-
-If you have performed TCR/BCR enrichment or want to add info for both gamma-delta and alpha-beta T cells, now we can just make a single list and use ```combineExpression()```. **Major note** if there are duplicate barcodes (if a cell has both Ig and TCR), the immune receptor information will not be added. As an anecdote, the [testing data](https://support.10xgenomics.com/single-cell-vdj/datasets/6.0.1/SC5v2_Melanoma_5Kcells_Connect_single_channel_SC5v2_Melanoma_5Kcells_Connect_single_channel) we used to improve this function had 5-6% of barcode overlap.
-
 
 ```{r}
 
 list.receptors <- c(combined_t, combined_b)
 
 ```
-
-```{r}
-
-list.receptors = lapply(list.receptors, function(df) {
-  df$barcode <- paste(df$sample, df$barcode, sep = "_")
-  return(df)
-})
-```
-
 
 
 ```{r}
@@ -160,35 +145,27 @@ seurat <- combineExpression(list.receptors,
 ```
 
 
-```{r, fig.width=5.5, fig.height=4}
+```{r}
 seurat_t <- combineExpression(combined_t, 
-                            gex_t, 
-                            cloneCall = "strict", 
-                            chain = "both",
-                            group.by = "sample", 
-                            proportion = FALSE, 
-                            cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
+                              gex_t, 
+                              cloneCall = "strict", 
+                              chain = "both",
+                              group.by = "sample", 
+                              proportion = FALSE, 
+                              cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
 
 ```
 
-### B/plasma cell clusters
 
-```{r, fig.width=5.5, fig.height=4}
+```{r}
 seurat_b <- combineExpression(combined_b, 
-                            gex_b, 
-                            cloneCall = "strict", 
-                            chain = "both",
-                            group.by = "sample", 
-                            proportion = FALSE, 
-                            cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
+                              gex_b, 
+                              cloneCall = "strict", 
+                              chain = "both",
+                              group.by = "sample", 
+                              proportion = FALSE, 
+                              cloneTypes=c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
 
 ```
 
 ***
-
-
-
-# sessionInfo
-```{r}
-sessionInfo()
-```
