@@ -168,6 +168,9 @@ gex = subset(gex,
 ### MiloR
 
 ```{r}
+disease_group = "All"
+disease_label = "AllSS"
+control_group = c("nonSS")
 
 milo <- Milo(as.SingleCellExperiment(gex))
 milo <- buildGraph(milo, 
