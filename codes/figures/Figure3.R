@@ -142,58 +142,6 @@ plot(ggplot() +
 )
 dev.off()
 
-b_clone = read.table(paste0(dir,"/output/BCR_contig_Frequency_Sequence_merged.txt"),sep="\t",header=TRUE)
-
-top_clone_n = 20
-
-for (disease_group in c("nonSS","pSS(SSA)","centSS","pSS(SSA/cent)")){
-  disease_label = gsub(" ","_",gsub("\\/","_",gsub("\\)","_",gsub("\\(","_",disease_group))))
-  top_clone = b_clone %>%
-    dplyr::filter(Disease == disease_group) %>%
-    dplyr::arrange(-Frequency.of.clonotypes) %>%
-    dplyr::distinct(combination.of.the.nucleotide.and.gene.sequence.CTstrict., .keep_all=TRUE) %>%
-    head(top_clone_n) %>%
-    .$combination.of.the.nucleotide.and.gene.sequence.CTstrict.
-  pdf(paste0(dir,"/output/figure/ExpandedClones_B_",disease_label,".pdf"), width = 3, height = 2)
-  plot(
-    b_clone %>%  
-      dplyr::distinct(barcode, .keep_all = TRUE) %>%
-      dplyr::filter(combination.of.the.nucleotide.and.gene.sequence.CTstrict. %in% top_clone) %>%
-      dplyr::group_by(combination.of.the.nucleotide.and.gene.sequence.CTstrict.) %>%
-      dplyr::mutate(Frequency = dplyr::n()) %>%
-      ungroup() %>%
-      merge(.,cluster_df[cluster_df$cell=="B/plasma",],by.x="clusters_B",by.y="cluster") %>%
-      dplyr::arrange(-Frequency) %>%
-      dplyr::mutate(value = 1) %>%
-      ggplot(., aes(x = reorder(combination.of.the.nucleotide.and.gene.sequence.CTstrict.,-Frequency), 
-                    y = value, 
-                    fill = factor(clusters_B))) +
-      geom_bar(stat = "identity") +
-      scale_fill_manual(name ="cluster", 
-                        labels = paste0("B-",cluster_df[cluster_df$cell=="B/plasma",]$cluster,":",cluster_df[cluster_df$cell=="B/plasma",]$clu_name),
-                        values=manual_colors) +
-      ggtitle(paste0("Cell clusters in expanded clones [", disease_group,"]")) +
-      labs(x = paste0("Top ",top_clone_n, " expanded clone"), 
-           y = "Cells in clone") +
-      theme_minimal() +
-      theme(strip.text.x=element_text(size=10, color="black"),
-            strip.text.y=element_text(size=10, color="black"),
-            legend.position = "none",
-            plot.title = element_text(size=10),
-            axis.title.x = element_text(size=10),
-            axis.title.y = element_text(size=10),
-            axis.text.y = element_text(size=10),
-            axis.text.x = element_blank(),
-            legend.text =  element_text(size = 10),
-            legend.key.size = grid::unit(0.5, "lines"),
-            legend.title = element_text(size = 0.8, hjust = 0)) + 
-      guides(fill = guide_legend(override.aes = list(size=1,alpha=1),
-                                 title = "cluster",
-                                 ncol = 1))
-  )
-  dev.off()
-}
-
 seurat_b@meta.data$cluster = dplyr::left_join(seurat_b@meta.data,
                                               cluster_df[cluster_df$cell=="B/plasma",] %>%
                                                 dplyr::mutate(seurat_clusters = cluster) %>%
